@@ -1,0 +1,300 @@
+<html>
+
+<head>
+    <title>p-norm visualization</title>
+    <style type="text/css">
+        #p-parameter-slider {
+            width: 100%;
+        }
+        
+        #l-parameter-slider {
+            width: 100%;
+        }
+        
+        #function,
+        #numbers,
+        #samples {
+            width: 600px;
+            height: 600px;
+            float: left;
+        }
+        
+        #data {
+            clear: both;
+        }
+        
+        #data textarea {
+            width: 45%;
+            height: 220px;
+        }
+    </style>
+    <script type="text/x-mathjax-config"> MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}}); </script>
+    <script type="text/javascript" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-AMS_CHTML">
+    </script>
+    <script src="3rdparty/numeric/numeric-1.2.6.min.js"></script>
+    <script src="3rdparty/fmin/fmin.min.js"></script>
+    <script src="3rdparty/d3/d3.min.js"></script>
+    <script src="3rdparty/function-plot/function-plot.js"></script>
+    <script type="text/javascript">
+        var functionPlot;
+        var p;
+        var t;
+        var lambda = 20;
+        var alpha = 0.5;
+        var X;
+        var y;
+        var svd;
+        var VTB;
+        var VTB_shrunk;
+        var reg_penalty;
+        var distance;
+        var optimum;
+        var optimum_ls;
+
+        function setupHandlers() {
+            var pslider = document.getElementById("p-parameter-slider");
+            var poutput = document.getElementById("p-parameter-field");
+            var lslider = document.getElementById("l-parameter-slider");
+            var loutput = document.getElementById("l-parameter-field");
+            var aslider = document.getElementById("a-parameter-slider");
+            var aoutput = document.getElementById("a-parameter-field");
+            var encheck = document.getElementById("elastic-net-check");
+            p = 2;
+            t = 1;
+            updateGraph();
+            updateText();
+            pslider.oninput = function () {
+                poutput.value = this.value / 10;
+                p = this.value / 10;
+                updateGraph();
+                updateText();
+            }
+            poutput.oninput = function () {
+                pslider.value = this.value * 10;
+                p = this.value;
+                updateGraph();
+                updateText();
+            }
+            lslider.oninput = function () {
+                loutput.value = this.value / 10;
+                lambda = this.value / 10;
+                updateGraph();
+                updateText();
+            }
+            loutput.oninput = function () {
+                lslider.value = this.value * 10;
+                lambda = this.value;
+                updateGraph();
+                updateText();
+            }
+            aslider.oninput = function () {
+                aoutput.value = this.value / 1000;
+                alpha = this.value / 1000;
+                updateGraph();
+                updateText();
+            }
+            aoutput.oninput = function () {
+                aslider.value = this.value * 1000;
+                alpha = this.value;
+                updateGraph();
+                updateText();
+            }
+            encheck.onclick = function () {
+                updateGraph();
+                updateText();
+            }
+        }
+
+        function rss(b) {
+            var sum = 0.0;
+            for (var i = 0; i < X.length; ++i) {
+                sum += Math.pow(y[i] - (b[0] * X[i][0] + b[1] * X[i][1]), 2);
+            }
+            return sum;
+        }
+
+        function regularization_penalty(x) {
+            if (!document.getElementById("elastic-net-check").checked) return lambda * (Math.pow(Math.abs(x[0]), p) + Math.pow(Math.abs(x[1]), p));
+            else return lambda * alpha * (Math.pow(Math.abs(x[0]), 2) + Math.pow(Math.abs(x[1]), 2)) + lambda * (1 - alpha) * (Math.abs(x[0]) + Math.abs(x[1]));
+        }
+
+        function objective(x) {
+            var primary_objective = rss(x);
+            var penalty = regularization_penalty(x);
+            return primary_objective + penalty;
+        }
+
+        function fn_string() {
+            var str = '0';
+            for (var i = 0; i < X.length; ++i) {
+                str += '+(' + y[i] + '-(' + X[i][0] + ')*x-(' + X[i][1] + ')*y)*(' + y[i] + '-(' + X[i][0] + ')*x-(' + X[i][1] + ')*y)';
+            }
+            return str;
+        }
+
+        function updateGraph() {
+            X = JSON.parse(document.getElementById("x-data").value);
+            y = JSON.parse(document.getElementById("y-data").value);
+            optimum = fmin.nelderMead(objective, [0, 0]).x;
+            optimum_ls = fmin.nelderMead(rss, [0, 0]).x;
+            reg_penalty = regularization_penalty(optimum) / lambda;
+            distance = rss(optimum);
+            var fn_str = fn_string() + '-' + distance;
+            var ball_str;
+            if (!document.getElementById("elastic-net-check").checked) ball_str = 'nthRoot(abs(x),10)^' + Math.round(10 * p) + '+nthRoot(abs(y),10)^' + Math.round(10 * p) + '-' + reg_penalty;
+            else ball_str = alpha + '*(x^2+y^2)+' + (1 - alpha) + '*(abs(x)+abs(y))-' + reg_penalty;
+            svd = numeric.svd(X);
+            VTB = [optimum_ls[0] * svd.V[0][0] + optimum_ls[1] * svd.V[1][0], optimum_ls[0] * svd.V[0][1] + optimum_ls[1] * svd.V[1][1]];
+            VTB_shrunk = [(svd.S[0] * svd.S[0] / (lambda + svd.S[0] * svd.S[0])) * VTB[0], (svd.S[1] * svd.S[1] / (lambda + svd.S[1] * svd.S[1])) * VTB[1]];
+            var Vcol1 = [svd.V[0][0], svd.V[1][0]];
+            var Vcol2 = [svd.V[0][1], svd.V[1][1]];
+            var inst_data = [{
+                    fn: ball_str
+                    , fnType: 'implicit'
+					}, {
+                    fn: fn_str
+                    , fnType: 'implicit'
+					}, {
+                    fn: '(x-' + optimum_ls[0] + ')*(x-' + optimum_ls[0] + ')+(y-' + optimum_ls[1] + ')*(y-' + optimum_ls[1] + ')-0.0001'
+                    , fnType: 'implicit'
+                    , color: 'black'
+					}, {
+                    fn: '(x-' + optimum[0] + ')*(x-' + optimum[0] + ')+(y-' + optimum[1] + ')*(y-' + optimum[1] + ')-0.0001'
+                    , fnType: 'implicit'
+                    , color: 'black'
+					}, {
+                    vector: [VTB[0] * Vcol1[0], VTB[0] * Vcol1[1]]
+                    , offset: [0, 0]
+                    , graphType: 'polyline'
+                    , fnType: 'vector'
+                    , color: 'gray'
+					}, {
+                    vector: [VTB[1] * Vcol2[0], VTB[1] * Vcol2[1]]
+                    , offset: [VTB[0] * Vcol1[0], VTB[0] * Vcol1[1]]
+                    , graphType: 'polyline'
+                    , fnType: 'vector'
+                    , color: 'gray'
+					}, {
+                    vector: [VTB_shrunk[0] * Vcol1[0], VTB_shrunk[0] * Vcol1[1]]
+                    , offset: [0, 0]
+                    , graphType: 'polyline'
+                    , fnType: 'vector'
+                    , color: 'black'
+					}, {
+                    vector: [VTB_shrunk[1] * Vcol2[0], VTB_shrunk[1] * Vcol2[1]]
+                    , offset: [VTB_shrunk[0] * Vcol1[0], VTB_shrunk[0] * Vcol1[1]]
+                    , graphType: 'polyline'
+                    , fnType: 'vector'
+                    , color: 'black'
+					}
+					];
+            var instance = functionPlot({
+                width: 600
+                , height: 600
+                , target: '#function'
+                , data: inst_data
+                , annotations: [{
+                    x: optimum_ls[0]
+                    , text: 'β[1] (least squares)'
+					}, {
+                    y: optimum_ls[1]
+                    , text: 'β[2] (least squares)'
+					}, {
+                    x: optimum[0]
+                    , text: 'β[1] (regularized)'
+					}, {
+                    y: optimum[1]
+                    , text: 'β[2] (regularized)'
+					}]
+            });
+            instance.draw();
+            var pcd1 = [
+					[-svd.S[0] * svd.V[0][0], -svd.S[0] * svd.V[1][0]]
+					, [svd.S[0] * svd.V[0][0], svd.S[0] * svd.V[1][0]]
+				];
+            var pcd2 = [
+					[-svd.S[1] * svd.V[0][1], -svd.S[1] * svd.V[1][1]]
+					, [svd.S[1] * svd.V[0][1], svd.S[1] * svd.V[1][1]]
+				];
+            var minx = Math.min(-svd.S[0] * svd.V[0][0], svd.S[0] * svd.V[0][0], svd.S[1] * svd.V[0][1], -svd.S[1] * svd.V[0][1]);
+            var maxx = Math.max(-svd.S[0] * svd.V[0][0], svd.S[0] * svd.V[0][0], svd.S[1] * svd.V[0][1], -svd.S[1] * svd.V[0][1]);
+            var miny = Math.min(-svd.S[0] * svd.V[1][0], svd.S[0] * svd.V[1][0], -svd.S[1] * svd.V[1][1], svd.S[1] * svd.V[1][1]);
+            var maxy = Math.max(-svd.S[0] * svd.V[1][0], svd.S[0] * svd.V[1][0], -svd.S[1] * svd.V[1][1], svd.S[1] * svd.V[1][1]);
+            var sample_instance = functionPlot({
+                width: 600
+                , height: 600
+                , xAxis: [Math.min(minx, miny), Math.max(maxx, maxy)]
+                , yAxis: [Math.min(minx, miny), Math.max(maxx, maxy)]
+                , target: '#samples'
+                , data: [{
+                    points: X
+                    , fnType: 'points'
+                    , graphType: 'scatter'
+                    , color: 'black'
+					}, {
+                    points: pcd1
+                    , graphType: 'polyline'
+                    , fnType: 'points'
+					}, {
+                    points: pcd2
+                    , graphType: 'polyline'
+                    , fnType: 'points'
+					}]
+            });
+        }
+
+        function updateText() {
+            var ridge = p == 2 && !document.getElementById("elastic-net-check").checked;
+            document.getElementById("beta-ls").innerHTML = "\$\\hat{\\beta}= \\begin{pmatrix}" + Number(optimum_ls[0]).toFixed(4) + "  \\\\ " + Number(optimum_ls[1]).toFixed(4) + " \\end{pmatrix}\$" + (ridge ? "\$  = (" + Number(VTB[0]).toFixed(4) + ")\\cdot\\begin{pmatrix}" + Number(svd.V[0][0]).toFixed(4) + "  \\\\ " + Number(svd.V[1][0]).toFixed(4) + " \\end{pmatrix}+(" + Number(VTB[1]).toFixed(4) + ")\\cdot\\begin{pmatrix}" + Number(svd.V[0][1]).toFixed(4) + "  \\\\ " + Number(svd.V[1][1]).toFixed(4) + " \\end{pmatrix}\$" : "");
+            document.getElementById("beta-r").innerHTML = "\$\\hat{\\beta}^{\\mathrm{reg}}= \\begin{pmatrix}" + Number(optimum[0]).toFixed(4) + "  \\\\ " + Number(optimum[1]).toFixed(4) + " \\end{pmatrix} \$" + (ridge ? "\$= (" + Number(VTB_shrunk[0]).toFixed(4) + ")\\cdot\\begin{pmatrix}" + Number(svd.V[0][0]).toFixed(4) + "  \\\\ " + Number(svd.V[1][0]).toFixed(4) + " \\end{pmatrix}+(" + Number(VTB_shrunk[1]).toFixed(4) + ")\\cdot\\begin{pmatrix}" + Number(svd.V[0][1]).toFixed(4) + "  \\\\ " + Number(svd.V[1][1]).toFixed(4) + " \\end{pmatrix}\$" : "");
+            document.getElementById("lambda").innerHTML = "\$\\lambda = " + Number(lambda).toFixed(4) + "\$";
+            document.getElementById("t").innerHTML = "\$t = " + Number(reg_penalty).toFixed(4) + "\$";
+            document.getElementById("sv1").innerHTML = "\$d_1 = " + Number(svd.S[0]).toFixed(4) + "\$";
+            document.getElementById("sv2").innerHTML = "\$d_2 = " + Number(svd.S[1]).toFixed(4) + "\$";
+            var df = svd.S[0] * svd.S[0] / (svd.S[0] * svd.S[0] + lambda) + svd.S[1] * svd.S[1] / (svd.S[1] * svd.S[1] + lambda);
+            document.getElementById("df").innerHTML = ridge ? "\$\\mathrm{df}(\\lambda) = " + Number(df).toFixed(4) + "\$" : "";
+            MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
+        }
+    </script>
+</head>
+
+<body onload="setupHandlers()">
+    <div>
+        <input type="range" min="1" max="500" value="20" id="p-parameter-slider" /> </div>
+    <div>
+        <label>p: </label>
+        <input type="text" value="2" id="p-parameter-field" /> </div>
+    <div>
+        <input type="range" min="1" max="5000" value="200" id="l-parameter-slider" /> </div>
+    <div>
+        <label>λ: </label>
+        <input type="text" value="20" id="l-parameter-field" /> </div>
+    <div>
+        <input type="range" min="0" max="1000" value="500" id="a-parameter-slider" /> </div>
+    <div>
+        <label>elastic net: </label>
+        <input type="checkbox" value="0" id="elastic-net-check" /> </div>
+    <div>
+        <label>α: </label>
+        <input type="text" value="0.5" id="a-parameter-field" /> </div>
+    <div id="function"> </div>
+    <div id="numbers">
+        <h1>Least square estimates</h1>
+        <p id="beta-ls" />
+        <h1>Regularized estimates</h1>
+        <p id="beta-r" />
+        <h1>Singular Values</h1>
+        <p id="sv1" />
+        <p id="sv2" />
+        <h1>Regularization parameters</h1>
+        <p id="lambda" />
+        <p id="t" />
+        <p id="df" /> </div>
+    <div id="samples"> </div>
+    <div id="data">
+        <textarea id="x-data"> [[ 4.72382540889946, 2.52850654622351], [ 1.36140935681462, 1.05370316407618], [ -1.80682096221791, 0.00839217717961], [ -3.48698990795862, -3.04060836135909], [ 4.80535492222722, 1.47820139706437], [ -2.56734120571256, -0.80039937491517], [ 2.19081915634858, -0.18644290449704], [ -3.09209779600023, -1.45637359582744], [ 0.453991585042832, 0.45026956854804], [ -2.58215055744338, -0.03524861649298]] </textarea>
+        <textarea id="y-data"> [ 7.81262542649048, 3.75408118812959, -3.94804523811570, -7.54984233783614, 6.96641452791572, -2.59378878504235, 1.17715220122136, -3.69743705770966, 2.12703784482643, -4.04819776987973]</textarea>
+    </div>
+</body>
+
+</html>
