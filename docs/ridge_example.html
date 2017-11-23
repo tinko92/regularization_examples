@@ -44,17 +44,17 @@ int main() {
         double ls_training = 0.0, ridge_training = 0.0;
 	double df = 0.0;
         for (int j = 0; j &lt; runs; ++j) {
-//            auto[X, y] = generate_sample();	//requires C++17
-		auto training_sample = generate_sample();
-		auto& X = training_sample.first;
-		auto& y = training_sample.second;
+//          auto[X, y] = generate_sample();	//requires C++17
+	    auto training_sample = generate_sample();
+	    auto& X = training_sample.first;
+	    auto& y = training_sample.second;
             Eigen::Matrix&lt;double, p, 1&gt; b_ls = (X.transpose() * X).ldlt().solve(X.transpose() * y);
             Eigen::Matrix&lt;double, p, 1&gt; b_ridge = (X.transpose() * X + lambda *
             Eigen::Matrix&lt;double, p, p&gt;::Identity()).ldlt().solve(X.transpose() * y);
 //          auto[X_test, y_test] = generate_sample();	//requires C++17
-		auto test_sample = generate_sample();
-		auto& X_test = test_sample.first;
-		auto& y_test = test_sample.second;
+	    auto test_sample = generate_sample();
+	    auto& X_test = test_sample.first;
+	    auto& y_test = test_sample.second;
             ls_training += (X * b_ls - y).squaredNorm();
             ridge_training += (X * b_ridge - y).squaredNorm();
             ls_test += (X_test * b_ls - y_test).squaredNorm();
