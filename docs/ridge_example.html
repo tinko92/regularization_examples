@@ -1,0 +1,70 @@
+<html>
+	<head>
+		<title>Ridge Regression</title>
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.8.0/highlight.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.4.0/languages/cpp.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.4.0/languages/sh.min.js"></script>
+		<script>hljs.initHighlightingOnLoad();</script>
+	</head>
+	<body>
+		<h1>main.cpp</h1>
+		<pre><code class="cpp">#include &lt;iostream&gt;
+#include &lt;random&gt;
+#include &lt;Eigen/Dense&gt;
+#include &lt;vector&gt;
+
+const int N = 10;
+const int p = 3;
+const int runs = 1'000'000;
+
+std::pair&lt;Eigen::Matrix&lt;double,N,p&gt;,Eigen::Matrix&lt;double,N,1&gt;&gt; generate_sample() {
+    std::default_random_engine generator(std::random_device{}());
+    std::normal_distribution hidden_dist(0.0,10.0);
+    std::normal_distribution input_noise(0.0,0.01);
+    std::normal_distribution output_noise(0.0,1);
+    Eigen::Matrix X;
+    Eigen::Matrix y;
+    for(int i=0;i&lt;N;++i) {
+        auto hidden1 = hidden_dist(generator);
+        auto hidden2 = hidden_dist(generator);
+        auto x1 = hidden1 - 2*hidden2 + input_noise(generator);
+        auto x2 = -hidden1 + 1.5*hidden2 + input_noise(generator);
+        auto x3 = hidden1 + hidden2 + input_noise(generator);
+        X.row(i) &lt;&lt; x1,x2,x3;
+        y.row(i) &lt;&lt; 2*x1-x2+x3 +output_noise(generator);
+    }
+    return std::make_pair(X,y);
+};
+
+int main() {
+    for(auto lambda : {0.0,0.01,0.1,1.0,10.0,100.0}) {
+        double ls_test = 0.0, ridge_test = 0.0;
+        double ls_training = 0.0, ridge_training = 0.0;
+	double df = 0.0;
+        for (int j = 0; j &lt; runs; ++j) {
+            auto[X, y] = generate_sample();
+            Eigen::Matrix b_ls = (X.transpose() * X).ldlt().solve(X.transpose() * y);
+            Eigen::Matrix b_ridge = (X.transpose() * X + lambda *
+            Eigen::Matrix::Identity()).ldlt().solve(X.transpose() * y);
+            auto[X_test, y_test] = generate_sample();
+            ls_training += (X * b_ls - y).squaredNorm();
+            ridge_training += (X * b_ridge - y).squaredNorm();
+            ls_test += (X_test * b_ls - y_test).squaredNorm();
+            ridge_test += (X_test * b_ridge - y_test).squaredNorm();
+	    df += (X*(X.transpose()*X+lambda*Eigen::Matrix::Identity()).inverse()*X.transpose()).trace();
+        }
+        std::cout &lt;&lt; "lambda: \t\t\t" &lt;&lt; lambda &lt;&lt; "\n";
+        std::cout &lt;&lt; "ls_training: \t\t"&lt;&lt; ls_training / runs &lt;&lt; "\n";
+        std::cout &lt;&lt; "ridge_training: \t" &lt;&lt; ridge_training / runs &lt;&lt; "\n";
+        std::cout &lt;&lt; "ls_test: \t\t\t" &lt;&lt; ls_test / runs &lt;&lt; "\n";
+        std::cout &lt;&lt; "ridge_test: \t\t" &lt;&lt; ridge_test / runs &lt;&lt; "\n";
+	std::cout &lt;&lt; "df(lambda): \t\t" &lt;&lt; df/runs &lt;&lt; "\n";
+    }
+}</code></pre>
+	<p>This will perform 1,000,000 runs of the example and print the average errors and degree of freedom to standard output. A compiler with C++17 support and Eigen3 are required to build. On 
+most unix systems with the dependencies installed to default directories it should build with </p>
+	<pre><code class="sh">g++ main.cpp -o ridge_test -std=c++17 -I /usr/include/eigen3</code></pre>
+	<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https%3A%2F%2Ftinko92.github.io%2Fregularization_examples%2Fridge_example.html" />
+	</body>
+</html>
