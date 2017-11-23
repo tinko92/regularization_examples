@@ -132,7 +132,9 @@
             return str;
         }
 
-        function updateGraph() {
+        function updateGraph() {	
+	   if(isNaN(p) || p < 0.1)
+		return;
             X = JSON.parse(document.getElementById("x-data").value);
             y = JSON.parse(document.getElementById("y-data").value);
             optimum = fmin.nelderMead(objective, [0, 0]).x;
@@ -243,7 +245,9 @@
             });
         }
 
-        function updateText() {
+        function updateText() {	
+	    if(isNaN(p) || p < 0.1)
+		return;
             var ridge = p == 2 && !document.getElementById("elastic-net-check").checked;
             document.getElementById("beta-ls").innerHTML = "\$\\hat{\\beta}= \\begin{pmatrix}" + Number(optimum_ls[0]).toFixed(4) + "  \\\\ " + Number(optimum_ls[1]).toFixed(4) + " \\end{pmatrix}\$" + (ridge ? "\$  = (" + Number(VTB[0]).toFixed(4) + ")\\cdot\\begin{pmatrix}" + Number(svd.V[0][0]).toFixed(4) + "  \\\\ " + Number(svd.V[1][0]).toFixed(4) + " \\end{pmatrix}+(" + Number(VTB[1]).toFixed(4) + ")\\cdot\\begin{pmatrix}" + Number(svd.V[0][1]).toFixed(4) + "  \\\\ " + Number(svd.V[1][1]).toFixed(4) + " \\end{pmatrix}\$" : "");
             document.getElementById("beta-r").innerHTML = "\$\\hat{\\beta}^{\\mathrm{reg}}= \\begin{pmatrix}" + Number(optimum[0]).toFixed(4) + "  \\\\ " + Number(optimum[1]).toFixed(4) + " \\end{pmatrix} \$" + (ridge ? "\$= (" + Number(VTB_shrunk[0]).toFixed(4) + ")\\cdot\\begin{pmatrix}" + Number(svd.V[0][0]).toFixed(4) + "  \\\\ " + Number(svd.V[1][0]).toFixed(4) + " \\end{pmatrix}+(" + Number(VTB_shrunk[1]).toFixed(4) + ")\\cdot\\begin{pmatrix}" + Number(svd.V[0][1]).toFixed(4) + "  \\\\ " + Number(svd.V[1][1]).toFixed(4) + " \\end{pmatrix}\$" : "");
