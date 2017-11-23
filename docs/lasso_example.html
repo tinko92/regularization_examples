@@ -1,0 +1,81 @@
+<html>
+	<head>
+		<title>Ridge Regression</title>
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.8.0/highlight.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.4.0/languages/cpp.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.4.0/languages/sh.min.js"></script>
+		<script>hljs.initHighlightingOnLoad();</script>
+	</head>
+	<body>
+		<h1>main.cpp</h1>
+		<pre><code class="cpp">#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+#include &lt;limits&gt;
+#include &lt;cmath&gt;
+#include &lt;mlpack/core.hpp&gt;
+#include &lt;mlpack/methods/lars/lars.hpp&gt;
+
+const int N=10;
+const int p=3;
+const int runs=1'000'000;
+const double alpha=0.2;
+
+std::pair&lt;arma::mat,arma::vec&gt; generate_sample() {
+    std::default_random_engine generator(std::random_device{}());
+    std::normal_distribution&lt;double&gt; hidden_dist(0.0,10.0);
+    std::normal_distribution&lt;double&gt; input_noise(0.0,0.01);
+    std::normal_distribution&lt;double&gt; output_noise(0.0,1);
+    arma::mat X(N,p);
+    arma::vec y(N);
+    for(int i=0;i&lt;N;++i) {
+        auto hidden1 = hidden_dist(generator);
+        auto hidden2 = hidden_dist(generator);
+        auto x1 = hidden1 - 2*hidden2 + input_noise(generator);
+        auto x2 = -hidden1 + 1.5*hidden2 + input_noise(generator);
+        auto x3 = hidden1 + hidden2 + input_noise(generator);
+        X.row(i) = arma::rowvec({x1 , x2 , x3});
+        y[i] = 2*x1-x2+x3 +output_noise(generator);
+    }
+    return std::make_pair(X,y);
+};
+
+int main() {
+	for(auto lambda : {0.0, 0.01, 0.1, 1.0, 10.0, 100.0,1'000.0}) {
+		double elastic_net_train_error=0.0;
+		double lasso_train_error=0.0;
+		double elastic_net_test_error=0.0;
+		double lasso_test_error=0.0;
+		double lasso_non_zero=0.0;
+		double elastic_net_non_zero=0.0;
+		for(int i=0;i&lt;runs;++i) {
+		        mlpack::regression::LARS elastic_net_model(false,(1-alpha)*lambda,alpha*lambda);
+			mlpack::regression::LARS lasso_model(false,lambda,0);
+
+        		auto [X,y] = generate_sample();
+        		arma::vec elastic_net_beta, lasso_beta;
+        		elastic_net_model.Train(X,y,elastic_net_beta,false);
+			lasso_model.Train(X,y,lasso_beta,false);
+
+			arma::vec elastic_net_y_hat = X*elastic_net_beta;
+			elastic_net_train_error += pow(arma::norm(elastic_net_y_hat-y),2);
+			arma::vec lasso_y_hat = X*lasso_beta;
+			lasso_train_error += pow(arma::norm(lasso_y_hat-y),2);
+
+			auto [X_test,y_test] = generate_sample();
+			arma::vec elastic_net_y_test_hat = X_test*elastic_net_beta;
+			elastic_net_test_error += pow(arma::norm(elastic_net_y_test_hat-y_test),2);
+			arma::vec lasso_y_test_hat = X_test*lasso_beta;
+			lasso_test_error += pow(arma::norm(lasso_y_test_hat-y_test),2);
+
+			lasso_non_zero += std::count_if(lasso_beta.begin(),lasso_beta.end(),[](double b){return b&gt;1e-10 || b&lt;-1e-10;});
+			elastic_net_non_zero += std::count_if(elastic_net_beta.begin(),elastic_net_beta.end(),[](double b){return b&gt;1e-10 || b&lt;-1e-10;});
+		}
+		std::cout &lt;&lt; elastic_net_train_error/runs &lt;&lt; "\n" &lt;&lt; lasso_train_error/runs &lt;&lt; "\n" &lt;&lt; elastic_net_test_error/runs &lt;&lt; "\n" &lt;&lt; lasso_test_error/runs &lt;&lt; "\n\n" &lt;&lt; elastic_net_non_zero/runs &lt;&lt; "\n" &lt;&lt; lasso_non_zero/runs &lt;&lt; "\n\n";
+	}
+}</code></pre>
+	<p>This will perform 1,000,000 runs of the example and print the average errors and degree of freedom to standard output. A compiler with C++17 support, armadillo and mlpack are required to build. On most unix systems with the dependencies installed to default directories it should build with </p>
+	<pre><code class="sh">g++ main.cpp -o lasso_test -std=c++17 -larmadillo -lmlpack</code></pre>
+	<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https%3A%2F%2Ftinko92.github.io%2Fregularization_examples%2Flasso_example" />
+	</body>
+</html>
