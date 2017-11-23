@@ -18,7 +18,8 @@
 
 const int N=10;
 const int p=3;
-const int runs=1'000'000;
+//const int runs=1'000'000;	//requires C++14
+const int runs=1000000;
 const double alpha=0.2;
 
 std::pair&lt;arma::mat,arma::vec&gt; generate_sample() {
@@ -41,7 +42,8 @@ std::pair&lt;arma::mat,arma::vec&gt; generate_sample() {
 };
 
 int main() {
-	for(auto lambda : {0.0, 0.01, 0.1, 1.0, 10.0, 100.0,1'000.0}) {
+//	for(auto lambda : {0.0, 0.01, 0.1, 1.0, 10.0, 100.0, 1'000.0}) { //requires C++14
+	for(auto lambda : {0.0, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0}) {
 		double elastic_net_train_error=0.0;
 		double lasso_train_error=0.0;
 		double elastic_net_test_error=0.0;
@@ -52,7 +54,10 @@ int main() {
 		        mlpack::regression::LARS elastic_net_model(false,(1-alpha)*lambda,alpha*lambda);
 			mlpack::regression::LARS lasso_model(false,lambda,0);
 
-        		auto [X,y] = generate_sample();
+//        		auto [X,y] = generate_sample(); //requires C++17
+			auto training_sample = generate_sample();
+			auto& X = training_sample.first;
+			auto& y = training_sample.second;
         		arma::vec elastic_net_beta, lasso_beta;
         		elastic_net_model.Train(X,y,elastic_net_beta,false);
 			lasso_model.Train(X,y,lasso_beta,false);
@@ -62,7 +67,10 @@ int main() {
 			arma::vec lasso_y_hat = X*lasso_beta;
 			lasso_train_error += pow(arma::norm(lasso_y_hat-y),2);
 
-			auto [X_test,y_test] = generate_sample();
+//        		auto [X_test,y_test] = generate_sample(); //requires C++17
+			auto test_sample = generate_sample();
+			auto& X_test = test_sample.first;
+			auto& y_test = test_sample.second;
 			arma::vec elastic_net_y_test_hat = X_test*elastic_net_beta;
 			elastic_net_test_error += pow(arma::norm(elastic_net_y_test_hat-y_test),2);
 			arma::vec lasso_y_test_hat = X_test*lasso_beta;
@@ -71,11 +79,12 @@ int main() {
 			lasso_non_zero += std::count_if(lasso_beta.begin(),lasso_beta.end(),[](double b){return b&gt;1e-10 || b&lt;-1e-10;});
 			elastic_net_non_zero += std::count_if(elastic_net_beta.begin(),elastic_net_beta.end(),[](double b){return b&gt;1e-10 || b&lt;-1e-10;});
 		}
-		std::cout &lt;&lt; elastic_net_train_error/runs &lt;&lt; "\n" &lt;&lt; lasso_train_error/runs &lt;&lt; "\n" &lt;&lt; elastic_net_test_error/runs &lt;&lt; "\n" &lt;&lt; lasso_test_error/runs &lt;&lt; "\n\n" &lt;&lt; elastic_net_non_zero/runs &lt;&lt; "\n" &lt;&lt; lasso_non_zero/runs &lt;&lt; "\n\n";
+		std::cout &lt;&lt; "elastic_net training error:\t"&lt;&lt; elastic_net_train_error/runs &lt;&lt; "\nLASSO training error:\t\t" &lt;&lt; lasso_train_error/runs &lt;&lt; "\nelastic_net test error:\t\t" &lt;&lt; elastic_net_test_error/runs &lt;&lt; "\nLASSO test error:\t\t" &lt;&lt; lasso_test_error/runs &lt;&lt; "\n\nelastic_net non-zeros:\t\t" &lt;&lt; elastic_net_non_zero/runs &lt;&lt; "\nlasso_non_zeroes:\t\t" &lt;&lt; lasso_non_zero/runs &lt;&lt; "\n\n";
 	}
-}</code></pre>
-	<p>This will perform 1,000,000 runs of the example and print the average errors and degree of freedom to standard output. A compiler with C++17 support, armadillo and mlpack are required to build. On most unix systems with the dependencies installed to default directories it should build with </p>
-	<pre><code class="sh">g++ main.cpp -o lasso_test -std=c++17 -larmadillo -lmlpack</code></pre>
+}
+</code></pre>
+	<p>This will perform 1,000,000 runs of the example and print the average errors and degree of freedom to standard output. A compiler with C++11 support, armadillo and mlpack are required to build. On most unix systems with the dependencies installed to default directories it should build with </p>
+	<pre><code class="sh">g++ main.cpp -o lasso_test -std=c++11 -larmadillo -lmlpack</code></pre>
 	<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https%3A%2F%2Ftinko92.github.io%2Fregularization_examples%2Flasso_example" />
 	</body>
 </html>
